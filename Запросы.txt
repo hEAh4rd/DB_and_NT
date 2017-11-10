@@ -1,0 +1,44 @@
+﻿--Легкие запросы--
+
+--1) Вывод списка имен и фамилий персонажей по параметру __status__, который может принимать значения 'Alive' и 'Dead'. То есть вывод имен песонажей, которые являются либо живыми, либо мертвыми. Отсортированно по фамилиям персонажей, в случае совпадения фамилий (или вообще отсутствия фамилии) сортировка производится по имени.--
+
+SELECT first_name, last_name FROM Characters WHERE status_of_character='__status__' ORDER BY last_name, first_name;
+
+--2) Вывод списка имен и фамилий персонажей по двум условиям:
+1. Возраст персонажей входит в заданный промежуток, определяемый параметрами __age1__ (нижняя граница) и __age2__ (верхняя граница). Каждый из этих параметров может принимать значения от 16 до 100. Так же для корректной работы необходимо, чтобы параметр __age2__ был больше либо равен праметру __age1__ (в случае равенства будут выведены персонажи конкретного возраста)
+2. Пол персонажей либо только мужской, либо только женский. Определяется параметром __sex__ (возможные значения: 'M', 'W').
+Список персонажей отсортирован по возрастанию возраста. Сортировка персонажей с одинаковым возрастом производится по имени.--
+
+SELECT first_name, last_name, age FROM Actors WHERE age>__age1__ and age<__age2__ and sex='__sex__' ORDER BY age ASC, first_name;
+
+--3) Вывод списка стай по параметрам __side__ ( допустимые значения: 'Light', 'Dark', 'both') и __statusOfPack__ (допустимые значения: 'is', 'is not').
+Т.е. вывод списка еще существующий или уже распавшихся стай, которые принадлежащих к одной из сторон.--
+
+SELECT name_of_pack FROM Packs WHERE side='__side__' and status_of_pack='__statusOfPack__'
+
+--4) Вывод списка имен, фамилий и возрастов актеров с помощью параметра __sex__ (допустимые значения: 'M', 'W'). Список отсортирован по возрасту.--
+
+SELECT first_name, last_name, age FROM Actors WHERE sex='__sex__' ORDER BY age ASC;
+
+--Средние запросы--
+
+--1) Запрос отображает какой актер каких персонажей сыграл. Выводится как таблица, в которой именам и фамилиям актеров сопоставляются имена и фамилии персонажей. Отсортированно по именам и фамилиям актеров.--
+
+SELECT a.first_name, a.last_name, c.first_name AS first_name_of_character, c.last_name AS last_name_of_character FROM Actors a INNER JOIN Characters c ON a.ID = c.Actor ORDER BY a.first_name, a.last_name;
+
+--2) Вывод имен, фамилий и типа существ персонажей по заданному типу существ с помощью параметра __type__ (допустимые значения: 'WereWolf', 'Chimera
+', 'Kitsune
+', 'Human
+', 'Kanima
+', 'Jaguar
+', 'Advisor
+', 'Darak', 'Hellhound
+', 'Banchee
+', 'Hunter'). отсортированно по именам персонажей.--
+
+SELECT c.first_name, c.last_name, e.type_of_essence FROM Characters c LEFT JOIN Essences e ON c.essence = e.ID WHERE type_of_essence='__type__' ORDER BY c.first_name;
+
+--3) Вывод всех существующих/распавшихся стай и всех мертвых/живых персонажей, принадлежащих этим стаям.
+Отбор стай по критерию существования осуществляется с помощью параметра __statusOfPack__ (допустимые значения: 'is', 'is not'). Отбор живых или мертвых персонажей осуществляется с помощью параметра __status__, который может принимать значения 'Alive' и 'Dead'. Сортировка происходит по названию стаи и именя персонажа.--
+
+SELECT p.name_of_pack, c.first_name, c.last_name FROM Characters c JOIN Characters_in_packs cp ON c.ID=cp.character JOIN Packs p ON p.ID=cp.pack WHERE p.status_of_pack='__statusOfPack__' and c.status_of_character='__status__' ORDER BY p.name_of_pack, c.first_name;

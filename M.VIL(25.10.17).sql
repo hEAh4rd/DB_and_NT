@@ -103,8 +103,8 @@ SET default_with_oids = false;
 
 CREATE TABLE actors (
     id integer NOT NULL,
-    first_name text NOT NULL,
-    last_name text NOT NULL,
+    first_name varchar(15) NOT NULL,
+    last_name varchar(15) NOT NULL,
     age integer NOT NULL,
     sex sex NOT NULL,
     season_of_start integer NOT NULL,
@@ -185,8 +185,8 @@ ALTER SEQUENCE actors_season_of_start_seq OWNED BY actors.season_of_start;
 
 CREATE TABLE characters (
     id integer NOT NULL,
-    first_name text,
-    last_name text,
+    first_name varchar(15),
+    last_name varchar(15),
     essence integer NOT NULL,
     actor integer NOT NULL,
     hierarchy hierarchy,
@@ -341,7 +341,7 @@ ALTER SEQUENCE characters_in_packs_pack_seq OWNED BY characters_in_packs.pack;
 
 CREATE TABLE essences (
     id integer NOT NULL,
-    type_of_essence text NOT NULL
+    type_of_essence varchar(15) NOT NULL
 );
 
 
@@ -374,7 +374,7 @@ ALTER SEQUENCE essences_id_seq OWNED BY essences.id;
 
 CREATE TABLE packs (
     id integer NOT NULL,
-    name_of_pack text NOT NULL,
+    name_of_pack varchar(15) NOT NULL,
     alpha integer,
     status_of_pack status_of_pack NOT NULL,
     side side NOT NULL
