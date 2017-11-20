@@ -14,6 +14,27 @@ SET check_function_bodies = false;
 SET client_min_messages = warning;
 SET row_security = off;
 
+DROP DATABASE "M.VIL";
+--
+-- Name: M.VIL; Type: DATABASE; Schema: -; Owner: postgres
+--
+
+CREATE DATABASE "M.VIL" WITH TEMPLATE = template0 ENCODING = 'UTF8' LC_COLLATE = 'Russian_Russia.1251' LC_CTYPE = 'Russian_Russia.1251';
+
+
+ALTER DATABASE "M.VIL" OWNER TO postgres;
+
+\connect "M.VIL"
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SET check_function_bodies = false;
+SET client_min_messages = warning;
+SET row_security = off;
+
 --
 -- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
 --
@@ -103,8 +124,8 @@ SET default_with_oids = false;
 
 CREATE TABLE actors (
     id integer NOT NULL,
-    first_name varchar(15) NOT NULL,
-    last_name varchar(15) NOT NULL,
+    first_name text NOT NULL,
+    last_name text NOT NULL,
     age integer NOT NULL,
     sex sex NOT NULL,
     season_of_start integer NOT NULL,
@@ -185,8 +206,8 @@ ALTER SEQUENCE actors_season_of_start_seq OWNED BY actors.season_of_start;
 
 CREATE TABLE characters (
     id integer NOT NULL,
-    first_name varchar(15),
-    last_name varchar(15),
+    first_name text,
+    last_name text,
     essence integer NOT NULL,
     actor integer NOT NULL,
     hierarchy hierarchy,
@@ -341,7 +362,7 @@ ALTER SEQUENCE characters_in_packs_pack_seq OWNED BY characters_in_packs.pack;
 
 CREATE TABLE essences (
     id integer NOT NULL,
-    type_of_essence varchar(15) NOT NULL
+    type_of_essence text NOT NULL
 );
 
 
@@ -374,7 +395,7 @@ ALTER SEQUENCE essences_id_seq OWNED BY essences.id;
 
 CREATE TABLE packs (
     id integer NOT NULL,
-    name_of_pack varchar(15) NOT NULL,
+    name_of_pack text NOT NULL,
     alpha integer,
     status_of_pack status_of_pack NOT NULL,
     side side NOT NULL
@@ -1030,6 +1051,13 @@ ALTER TABLE ONLY characters_in_packs
 
 ALTER TABLE ONLY packs
     ADD CONSTRAINT packs_alpha_fkey FOREIGN KEY (alpha) REFERENCES characters(id);
+
+
+--
+-- Name: public; Type: ACL; Schema: -; Owner: postgres
+--
+
+GRANT ALL ON SCHEMA public TO PUBLIC;
 
 
 --
