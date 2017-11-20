@@ -16,7 +16,7 @@ SELECT first_name, last_name, age FROM Actors WHERE age>__age1__ and age<__age2_
 
 SELECT name_of_pack FROM Packs WHERE side='__side__' and status_of_pack='__statusOfPack__'
 
---4) Вывод списка имен, фамилий персонажей либомужского либо енского пола с помощью параметра __sex__ (допустимые значения: 'M', 'W'). Список отсортирован по фамилиям.--
+--4) Вывод списка имен, фамилий персонажей либомужского либо женского пола с помощью параметра __sex__ (допустимые значения: 'M', 'W'). Список отсортирован по фамилиям.--
 
 SELECT last_name, first_name FROM Actors WHERE sex='__sex__' ORDER BY last_name ASC;
 
