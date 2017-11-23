@@ -36,7 +36,7 @@ SELECT a.first_name, a.last_name, c.first_name AS first_name_of_character, c.las
 ', 'Banchee
 ', 'Hunter'). отсортированно по именам персонажей.--
 
-SELECT c.first_name, c.last_name, e.type_of_essence FROM Characters c LEFT JOIN Essences e ON c.essence = e.ID WHERE type_of_essence='__type__' ORDER BY c.first_name;
+SELECT c.first_name, c.last_name, e.type_of_essence FROM Characters c JOIN Essences e ON c.essence = e.ID WHERE type_of_essence='__type__' ORDER BY c.first_name;
 
 --3) Вывод всех существующих/распавшихся стай и всех мертвых/живых персонажей, принадлежащих этим стаям.
 Отбор стай по критерию существования осуществляется с помощью параметра __statusOfPack__ (допустимые значения: 'is', 'is not'). Отбор живых или мертвых персонажей осуществляется с помощью параметра __status__, который может принимать значения 'Alive' и 'Dead'. Сортировка происходит по названию стаи и именя персонажа.--
