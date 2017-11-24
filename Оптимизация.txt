@@ -1,0 +1,532 @@
+﻿   
+   Простые запросы.
+
+1) Общий вид запроса:
+
+SELECT first_name, last_name FROM Characters WHERE status_of_character='__status__' ORDER BY last_name, first_name;
+
+Рассматриваемое значение параметра: __status__='Alive':
+
+До оптимизации:
+
+ EXPLAIN (ANALYZE) SELECT first_name, last_name FROM Characters WHERE status_of_character='Alive' ORDER BY last_name, first_name; (далее везде EXPLAIN (ANALYZE))
+                                                 QUERY PLAN
+-------------------------------------------------------------------------------------------------------------
+ Sort  (cost=2.54..2.62 rows=34 width=14) (actual time=0.103..0.106 rows=34 loops=1)
+   Sort Key: last_name, first_name
+   Sort Method: quicksort  Memory: 26kB
+   ->  Seq Scan on characters  (cost=0.00..1.68 rows=34 width=14) (actual time=0.015..0.028 rows=34 loops=1)
+         Filter: (status_of_character = 'Alive'::status)
+         Rows Removed by Filter: 20
+ Planning time: 0.184 ms
+ Execution time: 0.127 ms
+
+
+Оптимизация: добавлен индекс CREATE INDEX ON Characters(status_of_character);
+
+
+После оптимизации:
+M.VIL=# EXPLAIN (ANALYZE) SELECT first_name, last_name FROM Characters WHERE status_of_character='Alive' ORDER BY last_name, first_name;
+
+                                                 QUERY PLAN
+-------------------------------------------------------------------------------------------------------------
+ Sort  (cost=2.54..2.62 rows=34 width=14) (actual time=0.116..0.119 rows=34 loops=1)
+   Sort Key: last_name, first_name
+   Sort Method: quicksort  Memory: 26kB
+   ->  Seq Scan on characters  (cost=0.00..1.68 rows=34 width=14) (actual time=0.022..0.034 rows=34 loops=1)
+         Filter: (status_of_character = 'Alive'::status)
+         Rows Removed by Filter: 20
+ Planning time: 0.180 ms
+ Execution time: 0.145 ms
+
+Индекс использован не был. Принудительно заставим использовать индекс, запретив Seq Scan:
+
+SET enable_seqscan TO off;
+                                                                       QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=13.60..13.68 rows=34 width=14) (actual time=0.164..0.168 rows=34 loops=1)
+   Sort Key: last_name, first_name
+   Sort Method: quicksort  Memory: 26kB
+   ->  Index Scan using characters_status_of_character_idx on characters  (cost=0.14..12.74 rows=34 width=14) (actual time=0.027..0.043 rows=34 loops=1)
+         Index Cond: (status_of_character = 'Alive'::status)
+ Planning time: 0.203 ms
+ Execution time: 0.210 ms
+
+Вывод: использование индекса только увеличивает cost и время выполнения запроса как для выборки (WHERE), так и для сортировки(ORDER BY).
+
+2) Общий вид запроса:
+
+SELECT first_name, last_name, age FROM Actors WHERE age>__age1__ and age<__age2__ and sex='__sex__' ORDER BY age ASC, first_name;
+
+Рассматриваемые значения параметров: __age1__=23; __age2__=45; sex='M';
+
+До оптимизации:
+
+                                               QUERY PLAN
+---------------------------------------------------------------------------------------------------------
+ Sort  (cost=2.30..2.34 rows=19 width=17) (actual time=0.073..0.075 rows=17 loops=1)
+   Sort Key: age, first_name
+   Sort Method: quicksort  Memory: 26kB
+   ->  Seq Scan on actors  (cost=0.00..1.89 rows=19 width=17) (actual time=0.021..0.034 rows=17 loops=1)
+         Filter: ((age > 23) AND (age < 45) AND (sex = 'M'::sex))
+         Rows Removed by Filter: 34
+ Planning time: 0.254 ms
+ Execution time: 0.115 ms
+
+Оптимизация: добавлен индекс CREATE INDEX ON ACTORS(age);
+
+После оптимизации:
+
+                                               QUERY PLAN
+---------------------------------------------------------------------------------------------------------
+ Sort  (cost=2.30..2.34 rows=19 width=17) (actual time=0.083..0.084 rows=17 loops=1)
+   Sort Key: age, first_name
+   Sort Method: quicksort  Memory: 26kB
+   ->  Seq Scan on actors  (cost=0.00..1.89 rows=19 width=17) (actual time=0.030..0.043 rows=17 loops=1)
+         Filter: ((age > 23) AND (age < 45) AND (sex = 'M'::sex))
+         Rows Removed by Filter: 34
+ Planning time: 0.181 ms
+ Execution time: 0.117 ms
+
+Индекс использован не был. Принудительно заставим использовать индекс, запретив Seq Scan:
+
+SET enable_seqscan TO off;
+
+                                                           QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=13.29..13.33 rows=19 width=17) (actual time=0.103..0.105 rows=17 loops=1)
+   Sort Key: age, first_name
+   Sort Method: quicksort  Memory: 26kB
+   ->  Index Scan using actors_age_idx on actors  (cost=0.14..12.88 rows=19 width=17) (actual time=0.054..0.063 rows=17 loops=1)
+         Index Cond: ((age > 23) AND (age < 45))
+         Filter: (sex = 'M'::sex)
+         Rows Removed by Filter: 15
+ Planning time: 0.196 ms
+ Execution time: 0.144 ms
+
+Вывод: использование индекса только увеличивает cost и время выполнения запроса как для выборки (WHERE), так и для сортировки(ORDER BY). Кол-во Rows Removed by Filter уменьшилось. 
+
+добавим еще один индекс CREATE INDEX ON ACTORS(sex);
+
+
+                                                           QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=13.22..13.27 rows=19 width=17) (actual time=0.181..0.182 rows=17 loops=1)
+   Sort Key: age, first_name
+   Sort Method: quicksort  Memory: 26kB
+   ->  Index Scan using actors_sex_idx on actors  (cost=0.14..12.82 rows=19 width=17) (actual time=0.114..0.131 rows=17 loops=1)
+         Index Cond: (sex = 'M'::sex)
+         Filter: ((age > 23) AND (age < 45))
+         Rows Removed by Filter: 13
+ Planning time: 0.211 ms
+ Execution time: 0.218 ms
+
+Новый индекс использован, благодаря запрету на использование Seq Scan, но он также только увеличивает cost и время выполнения запроса как для выборки (WHERE), так и для сортировки(ORDER BY). Кол-во Rows Removed by Filter снова уменьшилось. 
+
+
+3)Общий вид запроса:
+
+SELECT name_of_pack FROM Packs WHERE side='__side__' and status_of_pack='__statusOfPack__'
+
+Рассматриваемые параметры: __side__='Light'; __statusOfPack__='is';
+
+До оптимизации:
+
+                                           QUERY PLAN
+------------------------------------------------------------------------------------------------
+ Seq Scan on packs  (cost=0.00..1.23 rows=5 width=14) (actual time=0.019..0.022 rows=7 loops=1)
+   Filter: ((side = 'Light'::side) AND (status_of_pack = 'is'::status_of_pack))
+   Rows Removed by Filter: 8
+ Planning time: 0.238 ms
+ Execution time: 0.044 ms
+
+Оптимизация: добавлен индекс CREATE INDEX ON Packs(side);
+
+После оптимизации:
+
+                                           QUERY PLAN
+------------------------------------------------------------------------------------------------
+ Seq Scan on packs  (cost=0.00..1.23 rows=5 width=14) (actual time=0.018..0.022 rows=7 loops=1)
+   Filter: ((side = 'Light'::side) AND (status_of_pack = 'is'::status_of_pack))
+   Rows Removed by Filter: 8
+ Planning time: 0.245 ms
+ Execution time: 0.042 ms
+
+Индекс использован не был. Принудительно заставим использовать индекс, запретив Seq Scan:
+
+SET enable_seqscan TO off;
+
+                                                       QUERY PLAN
+------------------------------------------------------------------------------------------------------------------------
+ Index Scan using packs_side_idx on packs  (cost=0.14..12.30 rows=5 width=14) (actual time=0.123..0.127 rows=7 loops=1)
+   Index Cond: (side = 'Light'::side)
+   Filter: (status_of_pack = 'is'::status_of_pack)
+   Rows Removed by Filter: 1
+ Planning time: 0.209 ms
+ Execution time: 0.165 ms
+
+Вывод:использование индекса только увеличивает cost и время выполнения запроса для выборки (WHERE). Кол-во Rows Removed by Filter уменьшилось. 
+
+Создадим еще один индекс: CREATE INDEX ON PACKS(status_of_pack);
+
+------------------------------------------------------------------------------------------------------------------------
+ Index Scan using packs_side_idx on packs  (cost=0.14..12.30 rows=5 width=14) (actual time=0.016..0.019 rows=7 loops=1)
+   Index Cond: (side = 'Light'::side)
+   Filter: (status_of_pack = 'is'::status_of_pack)
+   Rows Removed by Filter: 1
+ Planning time: 0.883 ms
+ Execution time: 0.052 ms
+
+Планировщик использует старый индекс, удалим его, чтобы посмотреть результаты работы нового:
+
+DROP INDEX packs_side_idx;
+
+                                                            QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using packs_status_of_pack_idx on packs  (cost=0.14..12.33 rows=5 width=14) (actual time=0.056..0.062 rows=7 loops=1)
+   Index Cond: (status_of_pack = 'is'::status_of_pack)
+   Filter: (side = 'Light'::side)
+   Rows Removed by Filter: 3
+ Planning time: 0.386 ms
+ Execution time: 0.088 ms
+
+Новый индекс также только увеличивает cost и время выполнения запроса как для выборки (WHERE). Кол-во Rows Removed by Filter увеличилось относительно первого индекса, и уменьшилось относительно начального запроса. 
+
+
+4) Общий вид запроса:
+
+SELECT last_name, first_name FROM Actors WHERE sex='__sex__' ORDER BY last_name ASC;
+
+Рассматриваемый параметр:__sex__='W';
+
+До оптимизации:            
+                                   QUERY PLAN
+---------------------------------------------------------------------------------------------------------
+ Sort  (cost=2.10..2.15 rows=21 width=13) (actual time=0.096..0.098 rows=21 loops=1)
+   Sort Key: last_name
+   Sort Method: quicksort  Memory: 26kB
+   ->  Seq Scan on actors  (cost=0.00..1.64 rows=21 width=13) (actual time=0.028..0.037 rows=21 loops=1)
+         Filter: (sex = 'W'::sex)
+         Rows Removed by Filter: 30
+ Planning time: 0.182 ms
+ Execution time: 0.124 ms
+
+Оптимизация: индекс actors_sex_idx уже создан.
+
+
+С оптимизацией:
+
+                                               QUERY PLAN
+---------------------------------------------------------------------------------------------------------
+ Sort  (cost=2.10..2.15 rows=21 width=13) (actual time=0.107..0.109 rows=21 loops=1)
+   Sort Key: last_name
+   Sort Method: quicksort  Memory: 26kB
+   ->  Seq Scan on actors  (cost=0.00..1.64 rows=21 width=13) (actual time=0.032..0.040 rows=21 loops=1)
+         Filter: (sex = 'W'::sex)
+         Rows Removed by Filter: 30
+ Planning time: 0.217 ms
+ Execution time: 0.138 ms
+
+Индекс использован не был. Принудительно заставим использовать индекс, запретив Seq Scan:
+
+                                                           QUERY PLAN
+--------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=8.97..9.02 rows=21 width=13) (actual time=0.079..0.081 rows=21 loops=1)
+   Sort Key: last_name
+   Sort Method: quicksort  Memory: 26kB
+   ->  Index Scan using actors_sex_idx on actors  (cost=0.14..8.51 rows=21 width=13) (actual time=0.018..0.024 rows=21 loops=1)
+         Index Cond: (sex = 'W'::sex)
+ Planning time: 0.160 ms
+ Execution time: 0.114 ms
+
+Вывод: использование индекса увеличивает cost для выборки (WHERE) и сортировки(ORDER BY), но уменьшает время выполнения.   
+
+
+   Средние запросы.
+
+1) Общий вид запроса:
+
+SELECT a.first_name, a.last_name, c.first_name AS first_name_of_character, c.last_name AS last_name_of_character FROM Actors a INNER JOIN Characters c ON a.ID = c.Actor ORDER BY a.first_name, a.last_name;
+
+До оптимизации:
+
+                                                      QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=5.98..6.12 rows=54 width=27) (actual time=0.383..0.387 rows=54 loops=1)
+   Sort Key: a.first_name, a.last_name
+   Sort Method: quicksort  Memory: 29kB
+   ->  Hash Join  (cost=2.15..4.43 rows=54 width=27) (actual time=0.071..0.093 rows=54 loops=1)
+         Hash Cond: (c.actor = a.id)
+         ->  Seq Scan on characters c  (cost=0.00..1.54 rows=54 width=18) (actual time=0.020..0.025 rows=54 loops=1)
+         ->  Hash  (cost=1.51..1.51 rows=51 width=17) (actual time=0.034..0.034 rows=51 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 11kB
+               ->  Seq Scan on actors a  (cost=0.00..1.51 rows=51 width=17) (actual time=0.010..0.015 rows=51 loops=1)
+ Planning time: 0.527 ms
+ Execution time: 0.434 ms
+
+Оптимизация: добавлен индекс CREATE INDEX ON Characters(Actor);
+
+После оптимизации:
+                                                      QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=5.98..6.12 rows=54 width=27) (actual time=0.255..0.258 rows=54 loops=1)
+   Sort Key: a.first_name, a.last_name
+   Sort Method: quicksort  Memory: 29kB
+   ->  Hash Join  (cost=2.15..4.43 rows=54 width=27) (actual time=0.067..0.088 rows=54 loops=1)
+         Hash Cond: (c.actor = a.id)
+         ->  Seq Scan on characters c  (cost=0.00..1.54 rows=54 width=18) (actual time=0.016..0.018 rows=54 loops=1)
+         ->  Hash  (cost=1.51..1.51 rows=51 width=17) (actual time=0.035..0.035 rows=51 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 11kB
+               ->  Seq Scan on actors a  (cost=0.00..1.51 rows=51 width=17) (actual time=0.009..0.017 rows=51 loops=1)
+ Planning time: 0.841 ms
+ Execution time: 0.309 ms
+
+Индекс использован не был. Принудительно заставим использовать индекс, запретив Seq Scan:
+
+                                                                    QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=28.21..28.35 rows=54 width=27) (actual time=0.186..0.191 rows=54 loops=1)
+   Sort Key: a.first_name, a.last_name
+   Sort Method: quicksort  Memory: 29kB
+   ->  Merge Join  (cost=0.28..26.66 rows=54 width=27) (actual time=0.008..0.056 rows=54 loops=1)
+         Merge Cond: (a.id = c.actor)
+         ->  Index Scan using actors_pkey on actors a  (cost=0.14..12.91 rows=51 width=17) (actual time=0.003..0.007 rows=51 loops=1)
+         ->  Index Scan using characters_actor_idx on characters c  (cost=0.14..12.95 rows=54 width=18) (actual time=0.002..0.012 rows=54 loops=1)
+ Planning time: 0.278 ms
+ Execution time: 0.223 ms
+
+Вывод: использование индекса увеличивает cost для склейки (INNER JOIN) и сортировки(ORDER BY), но уменьшает время выполнения запроса. 
+
+2) Общий вид запроса:
+
+SELECT c.first_name, c.last_name, e.type_of_essence FROM Characters c JOIN Essences e ON c.essence = e.ID WHERE type_of_essence='__type__' ORDER BY c.first_name;
+
+Рассматриваемые параметры: __type__='Human';
+
+До оптимизации:
+
+                                                      QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=3.00..3.01 rows=5 width=21) (actual time=0.085..0.085 rows=3 loops=1)
+   Sort Key: c.first_name
+   Sort Method: quicksort  Memory: 25kB
+   ->  Hash Join  (cost=1.15..2.94 rows=5 width=21) (actual time=0.048..0.057 rows=3 loops=1)
+         Hash Cond: (c.essence = e.id)
+         ->  Seq Scan on characters c  (cost=0.00..1.54 rows=54 width=18) (actual time=0.019..0.023 rows=54 loops=1)
+         ->  Hash  (cost=1.14..1.14 rows=1 width=11) (actual time=0.015..0.015 rows=1 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 9kB
+               ->  Seq Scan on essences e  (cost=0.00..1.14 rows=1 width=11) (actual time=0.010..0.012 rows=1 loops=1)
+                     Filter: ((type_of_essence)::text = 'Chimera'::text)
+                     Rows Removed by Filter: 10
+ Planning time: 0.316 ms
+ Execution time: 0.121 ms
+
+Оптимизация: добавлены индексы: CREATE INDEX ON Characters(Essence); CREATE INDEX ON Essences(type_of_essence);
+
+После оптимизации:
+
+                                                      QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=3.00..3.01 rows=5 width=21) (actual time=0.083..0.083 rows=3 loops=1)
+   Sort Key: c.first_name
+   Sort Method: quicksort  Memory: 25kB
+   ->  Hash Join  (cost=1.15..2.94 rows=5 width=21) (actual time=0.045..0.052 rows=3 loops=1)
+         Hash Cond: (c.essence = e.id)
+         ->  Seq Scan on characters c  (cost=0.00..1.54 rows=54 width=18) (actual time=0.012..0.015 rows=54 loops=1)
+         ->  Hash  (cost=1.14..1.14 rows=1 width=11) (actual time=0.014..0.014 rows=1 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 9kB
+               ->  Seq Scan on essences e  (cost=0.00..1.14 rows=1 width=11) (actual time=0.009..0.010 rows=1 loops=1)
+                     Filter: ((type_of_essence)::text = 'Chimera'::text)
+                     Rows Removed by Filter: 10
+ Planning time: 0.524 ms
+ Execution time: 0.119 ms
+
+Индекс использован не был. Принудительно заставим использовать индекс, запретив Seq Scan:
+
+SET enable_seqscan TO off;
+
+                                                                      QUERY PLAN
+------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=16.49..16.50 rows=5 width=21) (actual time=0.047..0.048 rows=3 loops=1)
+   Sort Key: c.first_name
+   Sort Method: quicksort  Memory: 25kB
+   ->  Nested Loop  (cost=0.28..16.43 rows=5 width=21) (actual time=0.025..0.027 rows=3 loops=1)
+         ->  Index Scan using essences_type_of_essence_idx on essences e  (cost=0.14..8.15 rows=1 width=11) (actual time=0.019..0.019 rows=1 loops=1)
+               Index Cond: ((type_of_essence)::text = 'Chimera'::text)
+         ->  Index Scan using characters_essence_idx on characters c  (cost=0.14..8.23 rows=5 width=18) (actual time=0.002..0.004 rows=3 loops=1)
+               Index Cond: (essence = e.id)
+ Planning time: 0.392 ms
+ Execution time: 0.088 ms
+
+Вывод: использование индекса увеличивает cost сортировки(ORDER BY), но уменьшает для склейки (JOIN), а также уменьшает время выполнения запроса. 
+
+
+3) Общий вид запроса:
+
+SELECT p.name_of_pack, c.first_name, c.last_name FROM Characters c JOIN Characters_in_packs cp ON c.ID=cp.character JOIN Packs p ON p.ID=cp.pack WHERE p.status_of_pack='__statusOfPack__' and c.status_of_character='__status__' ORDER BY p.name_of_pack, c.first_name;
+
+Рассматриваемые параметры: __statusOfPack__='is'; __status__='Alive';
+
+До оптимизации:
+                                                             QUERY PLAN
+------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=6.85..6.92 rows=28 width=28) (actual time=0.266..0.269 rows=35 loops=1)
+   Sort Key: p.name_of_pack, c.first_name
+   Sort Method: quicksort  Memory: 27kB
+   ->  Hash Join  (cost=3.41..6.18 rows=28 width=28) (actual time=0.120..0.153 rows=35 loops=1)
+         Hash Cond: (cp.pack = p.id)
+         ->  Hash Join  (cost=2.10..4.43 rows=42 width=18) (actual time=0.059..0.080 rows=46 loops=1)
+               Hash Cond: (cp."character" = c.id)
+               ->  Seq Scan on characters_in_packs cp  (cost=0.00..1.66 rows=66 width=8) (actual time=0.013..0.018 rows=66 loops=1)
+               ->  Hash  (cost=1.68..1.68 rows=34 width=18) (actual time=0.033..0.033 rows=34 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 10kB
+                     ->  Seq Scan on characters c  (cost=0.00..1.68 rows=34 width=18) (actual time=0.009..0.019 rows=34 loops=1)
+                           Filter: (status_of_character = 'Alive'::status)
+                           Rows Removed by Filter: 20
+         ->  Hash  (cost=1.19..1.19 rows=10 width=18) (actual time=0.046..0.046 rows=10 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 9kB
+               ->  Seq Scan on packs p  (cost=0.00..1.19 rows=10 width=18) (actual time=0.035..0.039 rows=10 loops=1)
+                     Filter: (status_of_pack = 'is'::status_of_pack)
+                     Rows Removed by Filter: 5
+ Planning time: 0.530 ms
+ Execution time: 0.431 ms
+
+Оптимизация: добавлены индексы: CREATE INDEX ON Characters_in_packs(pack); CREATE INDEX ON Characters_in_packs(Character); ранее были созданы индексы: characters_status_of_character_idx; packs_status_of_pack_idx;
+
+После оптимизации:
+                                                             QUERY PLAN
+------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=6.85..6.92 rows=28 width=28) (actual time=0.269..0.272 rows=35 loops=1)
+   Sort Key: p.name_of_pack, c.first_name
+   Sort Method: quicksort  Memory: 27kB
+   ->  Hash Join  (cost=3.41..6.18 rows=28 width=28) (actual time=0.085..0.125 rows=35 loops=1)
+         Hash Cond: (cp.pack = p.id)
+         ->  Hash Join  (cost=2.10..4.43 rows=42 width=18) (actual time=0.048..0.076 rows=46 loops=1)
+               Hash Cond: (cp."character" = c.id)
+               ->  Seq Scan on characters_in_packs cp  (cost=0.00..1.66 rows=66 width=8) (actual time=0.007..0.014 rows=66 loops=1)
+               ->  Hash  (cost=1.68..1.68 rows=34 width=18) (actual time=0.031..0.031 rows=34 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 10kB
+                     ->  Seq Scan on characters c  (cost=0.00..1.68 rows=34 width=18) (actual time=0.009..0.018 rows=34 loops=1)
+                           Filter: (status_of_character = 'Alive'::status)
+                           Rows Removed by Filter: 20
+         ->  Hash  (cost=1.19..1.19 rows=10 width=18) (actual time=0.026..0.026 rows=10 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 9kB
+               ->  Seq Scan on packs p  (cost=0.00..1.19 rows=10 width=18) (actual time=0.016..0.020 rows=10 loops=1)
+                     Filter: (status_of_pack = 'is'::status_of_pack)
+                     Rows Removed by Filter: 5
+ Planning time: 0.944 ms
+ Execution time: 0.364 ms
+
+
+Индекс использован не был. Принудительно заставим использовать индекс, запретив Seq Scan:
+                                                                                 QUERY PLAN
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=40.52..40.59 rows=28 width=28) (actual time=0.207..0.210 rows=35 loops=1)
+   Sort Key: p.name_of_pack, c.first_name
+   Sort Method: quicksort  Memory: 27kB
+   ->  Hash Join  (cost=12.81..39.85 rows=28 width=28) (actual time=0.045..0.100 rows=35 loops=1)
+         Hash Cond: (cp.pack = p.id)
+         ->  Merge Join  (cost=0.28..26.89 rows=42 width=18) (actual time=0.014..0.057 rows=46 loops=1)
+               Merge Cond: (c.id = cp."character")
+               ->  Index Scan using characters_pkey on characters c  (cost=0.14..13.09 rows=34 width=18) (actual time=0.009..0.023 rows=34 loops=1)
+                     Filter: (status_of_character = 'Alive'::status)
+                     Rows Removed by Filter: 20
+               ->  Index Scan using characters_in_packs_character_idx on characters_in_packs cp  (cost=0.14..13.13 rows=66 width=8) (actual time=0.002..0.012 rows=64 loops=1)
+         ->  Hash  (cost=12.40..12.40 rows=10 width=18) (actual time=0.015..0.015 rows=10 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 9kB
+               ->  Index Scan using packs_pkey on packs p  (cost=0.14..12.40 rows=10 width=18) (actual time=0.003..0.008 rows=10 loops=1)
+                     Filter: (status_of_pack = 'is'::status_of_pack)
+                     Rows Removed by Filter: 5
+ Planning time: 0.598 ms
+ Execution time: 0.284 ms
+
+
+Вывод: использование индекса увеличивает cost почти везде, но уменьшает время выполнения.   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
