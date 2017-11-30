@@ -3,7 +3,7 @@
 --1) Запрос выводит имена и фамилии актеров, которые уже завершили свое участие в сериале, и подсчитывает количество сезонов, в которых актер снялся. Список отсортирован, в первую очередь, по  возрастанию кол-ва сезонов, при совпадении сортировка ведется по именам и фамилиям.-- 
 
 
-SELECT first_name, last_name, s.number_of_season AS season_of_start, s1.number_of_season AS season_of_finish, (a.season_of_finish-a.season_of_start+1) AS seasons_count FROM (SELECT last_name, first_name, season_of_start, season_of_finish FROM actors WHERE season_of_finish IS NOT NULL) AS a LEFT JOIN seasons s ON (a.season_of_start=s.id) LEFT JOIN seasons s1 ON (a.season_of_finish=s1.id) ORDER BY seasons_count, first_name, last_name;
+SELECT first_name, last_name, s.number_of_season AS season_of_start, s1.number_of_season AS season_of_finish, (a.season_of_finish-a.season_of_start+1) AS seasons_count FROM (SELECT last_name, first_name, season_of_start, season_of_finish FROM actors WHERE season_of_finish IS NOT NULL) AS a JOIN seasons s ON (a.season_of_start=s.id) JOIN seasons s1 ON (a.season_of_finish=s1.id) ORDER BY seasons_count, first_name, last_name;
 
 --2) Запрос выводит имена и фамилии актеров, которые сыграли более, чем одного персонажа, подсчитывает и кол-во и выводит имена и фамилии этих персонажей. Список отсортирован по кол-ву сынгранных персонажей. Далее сортировка ведется по именам и фамилиям актеров.-- 
 
@@ -11,4 +11,4 @@ SELECT a.first_name AS name_of_actor, a.last_name AS surname_of_actor, count_of_
 
 --3) Запрос выводит имена и фамилии персонажей, которые фигурировали в определенном сезоне (в данном случае 3b), и принадлежат к определенному виду существ (в данном случае "WereWolf"). И сезон, и существо можно задать параметром, конкретные значени выбраны для простоты. В случае сезона, сравнению подлежит не его номер, а его ID, так как они не всегда совпадают. Список отсортирован по именам и фамилиям персонажей.
 
-SELECT ch.first_name, ch.last_name FROM (SELECT ch.first_name, ch.last_name, essence, a.season_of_start, a.season_of_finish from (SELECT first_name, last_name, type_of_essence AS essence, actor FROM characters ch INNER JOIN essences es ON (ch.essence=es.id AND es.type_of_essence='WereWolf')) AS ch join actors a ON ch.actor=a.id) AS ch INNER JOIN seasons s ON ch.season_of_start=s.id WHERE (ch.season_of_start<4 AND (4<ch.season_of_finish OR ch.season_of_finish IS NULL)) ORDER BY ch.first_name, ch.last_name;
+SELECT ch.first_name, ch.last_name FROM (SELECT ch.first_name, ch.last_name, essence, a.season_of_start, a.season_of_finish from (SELECT first_name, last_name, type_of_essence AS essence, actor FROM characters ch INNER JOIN essences es ON (ch.essence=es.id AND es.type_of_essence='WereWolf')) AS ch JOIN actors a ON ch.actor=a.id) AS ch INNER JOIN seasons s ON ch.season_of_start=s.id WHERE (ch.season_of_start<4 AND (4<ch.season_of_finish OR ch.season_of_finish IS NULL)) ORDER BY ch.first_name, ch.last_name;
